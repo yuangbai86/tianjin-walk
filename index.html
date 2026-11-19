@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>嘛去呀？——天津散步</title>
+  <meta name="description" content="嘛去呀？——天津散步 A Little Walk in Tianjin：在一片温暖的天津印象街区里第一人称散步，看海河、小洋楼与天津之眼，跟街坊聊两句。" />
+  <meta name="theme-color" content="#bfe3d9" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23b85c45'/%3E%3Ccircle cx='32' cy='28' r='15' fill='none' stroke='%23fbf6ec' stroke-width='3'/%3E%3Cpath d='M22 50 L32 28 L42 50' stroke='%23fbf6ec' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene" aria-label="天津街区 3D 场景"></canvas>
+    <div id="touch-layer"></div>
+
+    <!-- 探索 HUD -->
+    <div id="hud" class="hidden">
+      <div class="hud-tl">
+        <div class="hud-title">嘛去呀？<span>天津印象街区</span></div>
+        <div class="hud-loc" id="hud-loc">小洋楼街</div>
+      </div>
+      <div class="hud-tr">
+        <button class="icon-btn" id="btn-sound" aria-label="声音开关" title="声音"></button>
+        <button class="icon-btn stamp-btn" id="btn-stamps" aria-label="印章本" title="印章本 (B)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+          <span id="stamp-count">0/3</span>
+        </button>
+        <button class="icon-btn" id="btn-overview" aria-label="全景" title="看全景 (V)">
+          <svg viewBox="0 0 24 24"><path d="M3 8l9-5 9 5-9 5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 12.5l9 5 9-5M3 16.5l9 5 9-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-settings" aria-label="暂停与设置" title="暂停与设置">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+      </div>
+      <div id="crosshair"></div>
+      <div id="prompt"><span class="key">E</span><span class="verb">聊两句</span><span class="who"></span></div>
+      <div id="hint"></div>
+      <div id="joystick"><div class="knob"></div></div>
+      <button id="btn-act" class="hidden">聊两句</button>
+    </div>
+    <div id="toasts"></div>
+
+    <!-- 加载 -->
+    <section id="loading" class="screen">
+      <div class="load-card">
+        <h1>嘛去呀？</h1>
+        <p class="en">A Little Walk in Tianjin</p>
+        <div class="bar indeterminate" id="load-bar"><i></i></div>
+        <p class="load-step" id="load-step">正在出门……</p>
+      </div>
+    </section>
+
+    <!-- 开始 -->
+    <section id="title" class="screen hidden">
+      <div class="title-card">
+        <h1>嘛去呀？</h1>
+        <p class="sub">来天津，溜达溜达。</p>
+        <p class="en">A Little Walk in Tianjin</p>
+        <div class="title-actions">
+          <button class="btn primary" id="btn-start">开始散步</button>
+          <button class="btn ghost" id="btn-howto">怎么玩</button>
+        </div>
+        <div class="pills"><button class="pill" id="btn-title-sound">声音：开</button><button class="pill" id="btn-title-music">音乐：开</button></div>
+        <p class="note">天津印象街区 · 艺术化浓缩地图，非真实地理比例</p>
+      </div>
+    </section>
+
+    <!-- 点击继续 -->
+    <section id="resume" class="screen hidden">
+      <button class="resume-btn" id="btn-resume">点击继续散步</button>
+      <p class="resume-tip" id="resume-tip"></p>
+    </section>
+
+    <!-- 全景模式 -->
+    <section id="overview" class="hidden">
+      <p class="ov-tip">拖动旋转 · 滚轮或双指缩放 · 这就是整片“天津印象街区”</p>
+      <button class="btn primary" id="btn-back-street">回到街上</button>
+    </section>
+
+    <!-- 收尾 -->
+    <section id="finale" class="hidden" aria-live="polite">
+      <div class="finale-card">
+        <p class="finale-eyebrow">这一圈儿溜达完了</p>
+        <h2 id="finale-line"></h2>
+        <ul id="finale-list"></ul>
+        <div class="finale-seals" id="finale-seals"></div>
+        <div class="row-btns">
+          <button class="btn primary" id="btn-finale-postcard">看看明信片</button>
+          <button class="btn ghost" id="btn-finale-walk">接着溜达</button>
+          <button class="btn ghost" id="btn-finale-restart">重新开始</button>
+        </div>
+        <p class="finale-note">天津之眼还亮着灯，想逛就接着逛，没人催您了。</p>
+      </div>
+    </section>
+
+    <!-- 对话 -->
+    <div id="dialogue" role="dialog" aria-live="polite">
+      <div class="dlg-panel">
+        <button class="dlg-close" aria-label="结束对话">×</button>
+        <div class="dlg-head"><span class="dlg-name"></span><span class="dlg-title"></span></div>
+        <div class="dlg-body"><p class="dlg-text"></p><div class="dlg-gloss"></div></div>
+        <div class="dlg-foot"><div class="dlg-options"></div><button class="dlg-next">继续 ▸</button></div>
+        <p class="dlg-keys">点击或按 E / 空格 显示整句 · 数字键选择 · Esc 结束</p>
+      </div>
+    </div>
+
+    <!-- 暂停与设置 -->
+    <section id="pause" class="modal hidden">
+      <div class="card">
+        <h2>歇会儿</h2>
+        <button class="btn primary wide" id="btn-continue">继续散步</button>
+        <div class="settings">
+          <label class="row"><span>声音</span><input type="checkbox" id="set-sound" /></label>
+          <label class="row"><span>音效音量</span><input type="range" id="set-volume" min="0" max="1" step="0.05" /></label>
+          <label class="row"><span>背景音乐</span><input type="checkbox" id="set-music" /></label>
+          <label class="row"><span>音乐音量</span><input type="range" id="set-music-volume" min="0" max="1" step="0.05" /></label>
+          <label class="row"><span>鼠标灵敏度</span><input type="range" id="set-sens" min="0.3" max="2.5" step="0.1" /></label>
+          <label class="row"><span>画质</span>
+            <select id="set-quality"><option value="auto">自动</option><option value="high">高（环境光遮蔽）</option><option value="medium">中</option><option value="low">低</option></select>
+          </label>
+        </div>
+        <div class="row-btns">
+          <button class="btn ghost" id="btn-pause-overview">看全景</button>
+          <button class="btn ghost" id="btn-pause-stamps">印章本</button>
+          <button class="btn ghost" id="btn-pause-howto">怎么玩</button>
+          <button class="btn ghost danger" id="btn-restart">重新开始</button>
+        </div>
+        <div class="confirm hidden" id="confirm-restart">
+          <p>重新开始会清空印章和聊天记录（设置会保留）。确定吗？</p>
+          <div class="row-btns"><button class="btn danger" id="btn-restart-yes">确定，重新溜达</button><button class="btn ghost" id="btn-restart-no">算了</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 印章本 -->
+    <section id="stampbook" class="modal hidden">
+      <div class="card">
+        <h2>探索印章</h2>
+        <p class="muted">不着急，溜达着溜达着就有了。</p>
+        <div class="stamps" id="stamp-list"></div>
+        <p class="done-line hidden" id="done-line"></p>
+        <div class="row-btns">
+          <button class="btn primary hidden" id="btn-open-postcard">查看纪念明信片</button>
+          <button class="btn ghost hidden" id="btn-replay-finale">再看一遍结尾</button>
+          <button class="btn ghost" data-close>回去溜达</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 明信片 -->
+    <section id="postcard" class="modal hidden">
+      <div class="card wide">
+        <h2>天津旅行纪念明信片</h2>
+        <img id="postcard-img" alt="天津旅行纪念明信片" />
+        <div class="row-btns">
+          <a class="btn primary" id="btn-download" download="tianjin-walk-postcard.png">下载明信片</a>
+          <button class="btn ghost" data-close>收好了</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 怎么玩 -->
+    <section id="howto" class="modal hidden">
+      <div class="card">
+        <h2>怎么玩</h2>
+        <div class="howto-grid">
+          <div class="desk-only">
+            <h3>电脑</h3>
+            <ul>
+              <li><b>WASD / 方向键</b> 走动（按住 Shift 走快点）</li>
+              <li><b>鼠标</b> 环顾四周</li>
+              <li><b>E</b> 跟人聊两句 / 互动；对话中跳过打字</li>
+              <li><b>1 2 3</b> 选择对话选项</li>
+              <li><b>B</b> 印章本 · <b>V</b> 看全景（像摆弄一个微缩模型） · <b>Esc</b> 结束对话或暂停</li>
+            </ul>
+          </div>
+          <div class="touch-only">
+            <h3>手机</h3>
+            <ul>
+              <li>屏幕<b>左侧</b>按住拖动：走动</li>
+              <li>屏幕<b>右侧</b>拖动：环顾</li>
+              <li>看向人或物件时，点右下角的<b>互动按钮</b></li>
+            </ul>
+          </div>
+          <div>
+            <h3>溜达点儿嘛</h3>
+            <ul>
+              <li>顺着路牌走：小洋楼街 → 海河步道 → 天津之眼观景点 → 口袋广场 → 槐荫里，一圈两三分钟。</li>
+              <li>看向街坊，出现“E 聊两句”就能搭话。</li>
+              <li>集齐三枚印章：<b>津门早点</b>、<b>海河散步</b>、<b>天津熟人</b>，解锁纪念明信片。</li>
+              <li>长椅能坐，车铃能按，小猫会理你。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="row-btns"><button class="btn primary" data-close>知道了</button></div>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
